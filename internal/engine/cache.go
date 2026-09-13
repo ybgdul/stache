@@ -6,10 +6,7 @@ import (
 	"containers/list"
 )
 
-var (
-	ErrItemTooLarge = errors.New("item size exceeds the allowed limit")
-	ErrKeyNotFound = errors.New("key not found")
-)
+
 
 type LimitsConfig struct{
 	MaxMemoryBytes int64
@@ -56,7 +53,7 @@ func (c *Cache) Set(key string, value []byte, ttl time.Duration) error {
 	}
 
 	c.mu.Lock()
-	defer c.mu.UNLock()
+	defer c.mu.Unlock()
 
 	var expiresAt time.Time
 	it ttl > 0 { 
