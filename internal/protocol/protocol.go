@@ -11,6 +11,8 @@ const (
 	CmdSet
 	CmdDelete
 	CmdClear 
+	CmdStats
+	CmdStop
 )
 
 const ( 

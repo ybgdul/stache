@@ -4,6 +4,7 @@ import (
 	"error"
 	"sync"
 	"containers/list"
+	"bytes"
 )
 
 
@@ -14,6 +15,14 @@ type LimitsConfig struct{
 	CleanUpInterval time.Duration
 }
 
+type Stats struct { 
+	Hits int64
+	Misses int64
+	ItemCount int64
+	CurrentBytes int64 
+	MaxMemory int64
+}
+
 type Cache struct{
 	mu sync.RWMutex
 	items map[string]*list.Element
@@ -21,6 +30,7 @@ type Cache struct{
 	currentBytes int64
 	maxMemoryBytes int64
 	maxItemBytes int64
+	stats *Stats
 	stopJanitor chan struct{}
 }
 
@@ -39,6 +49,13 @@ func New(cfg LimitsConfig) *Cache {
 		evictionList: list.New(),
 		maxMemoryBytes: cfg.MaxMemoryBytes,
 		maxItemBytes: cfg.MaxItemBytes,
+		Stats: &Stats{
+			Hits: 0,
+			Misses: 0,
+			ItemCount: 0,
+			CurrentBytes: 0,
+			MaxMemory: cfg.MaxMemoryBytes,
+		}
 		stopJanitor: make(chan struct{}),
 	}
 
@@ -73,7 +90,9 @@ func (c *Cache) Set(key string, value []byte, ttl time.Duration) error {
 		c.evictionList.MoveToFront(elem)
 		oldEntry:= elem.Value(*entry)
 		c.currentBytes -= oldEntry.value.SizeBytes
+		c.stats.CurrentBytes -= oldEntry.value.SizeBytes 
 		oldEntry.value = newItem
+		c.currentBytes += newItem.SizeBytes
 		c.currentBytes += newItem.SizeBytes
 		c.evictIfNecessary()
 		return nil
@@ -87,6 +106,9 @@ func (c *Cache) Set(key string, value []byte, ttl time.Duration) error {
 	c.items[key] = elem
 	c.currentBytes += newItem.SizeBytes
 
+	c.stats.CurrentBytes += newItem.SizeBytes
+	c.stats.ItemCount++
+
 	c.evictIfNecessary()
 	return nil
 }
@@ -97,16 +119,19 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 
 	elem, exists := c.items[key]
 	if !exists { 
+		c.stats.Misses++
 		return nil, false
 	}
 	ent := elem.Value.(*entry)
 	if ent.value.IsExpired() {
 		c.removeElement(elem)
+		c.stats.Misses++
 		return nil, false 
 	}
 
 	c.evictionList.MoveToFront(elem)
 	ent.value.LastAccess = time.Now()
+	c.stats.Hits++
 	return ent.value.Value, true
 }
 
@@ -129,6 +154,18 @@ func (c *Cache) Clear() {
 	c.items = make(map[string]*list.Element)
 	c.evictionList.Init()
 	c.currentBytes = 0
+	c.stats.ItemCount = 0
+	c.stats.CurrentBytes = 0
+}
+
+func (c *Cache) GetStats() []byte { 
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, c.stats)
+
+	return buf.Bytes()
 }
 
 func (c *Cache) evictIfNecessary() { 
@@ -147,6 +184,8 @@ func (c *Cache) evictIfNecessary() {
 func (c *Cache) removeElement(elem *list.Element) { 
 	c.evictionList.Remove(elem)
 	ent := elem.Value.(*entry)
+	c.stats.ItemCount--
+	c.stats.CurrentBytes -= ent.value.SizeBytes
 	delete(c.items, ent.key)
 	c.currentBytes -= ent.value.SizeBytes
 }

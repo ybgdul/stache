@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
+	"stache/internal/engine"
 	"stache/internal/protocol"
 	"time"
 )
@@ -45,6 +48,34 @@ func main() {
 		} else { 
 			fmt.Printf("Failed to clear cache: %v\n", resp.Err)
 		}
+	case "stats": 
+		req := &protocol.Request{
+			Cmd: protocol.CmdStats,
+		}
+		if err := protocol.WriteRequest(conn, req); err != nil { 
+			fmt.Printf("Error sending command: %v\n", err)
+			os.Exit(1)
+		}
+
+		resp, err := protocol.ReadResponse(conn)
+		if err != nil { 
+			fmt.Printf("Error reading response: %v\n", err)
+		}
+
+		reader := bytes.NewReader(resp.Value)
+		
+		var stats engine.Stats
+		unmarshalErr := binary.Read(reader, binary.BigEndian, &stats)
+		if unmarshalErr != nil { 
+			fmt.Printf("Error reading stats: %v\n", err)
+		}
+
+		fmt.Printf("Hits : %d\n", stats.Hits)
+		fmt.Printf("Misses : %d\n", stats.Misses)
+		fmt.Printf("Item Count : %d\n", stats.ItemCount)
+		fmt.Printf("Current Bytes : %d\n", stats.CurrentBytes)
+		fmt.Printf("Maximum Memory : %d\n", stats.MaxMemory)
+
 
 	case "status": 
 		fmt.Println("stache daemon is running and reachable")

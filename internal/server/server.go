@@ -8,6 +8,7 @@ import (
 	"stache/internal/engine"
 	"stache/internal/protocol"
 	"sync"
+	"time"
 )
 
 type Server struct{
@@ -104,6 +105,18 @@ func (s *Server) dispatch(req *protocol.Request) *protocol.Response {
 	case protocol.CmdClear: 
 		s.cache.Clear()
 		return &protocol.Response{Status: protocol.StatusOk}
+
+	case protocol.CmdStats: 
+		statBytes := s.cache.GetStats()
+		return &protocol.Response{Status: protocol.StatusOk, Value: statBytes}
+
+	case protocol.CmdStop: 
+		go func() { 
+			time.Sleep(60 * time.Millisecond)
+			s.Stop()
+		}()
+		return &protocol.Response{Status: protocol.StatusOk}
+
 	default:
 		return &protocol.Response{Status: protocol.StatusErr, Err: "unknown command"}
 	}
