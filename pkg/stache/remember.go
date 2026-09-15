@@ -15,7 +15,7 @@ func Remember[T any] (
 ) (T, error) {
 	var empty T 
 
-	res, err := c.sf.DoGroup(key, func() (interface{}, error) {
+	res, err := c.sf.DoGroup(key, func() (any, error) {
 		cachedBytes, found, err := c.Get(key)
 		if err != nil && found {
 			var val T

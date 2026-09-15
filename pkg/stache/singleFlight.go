@@ -4,7 +4,7 @@ import "sync"
 
 type call struct{ 
 	wg sync.WaitGroup
-	val interface{}
+	val any
 	err error
 }
 
@@ -13,12 +13,12 @@ type Group struct{
 	callMap map[string]*call
 }
 
-func (g *Group) DoGroup(key string, fn func() (interface{}, error)) (interface{}, error) {
+func (g *Group) DoGroup(key string, fn func() (any, error)) (any, error) {
 	g.mu.Lock()
 	if g.callMap == nil { 
 		g.callMap = make(map[string]*call)
 	}
-	if c, ok := g.callMap[key]; !ok { 
+	if c, ok := g.callMap[key]; ok { 
 		g.mu.Unlock()
 		c.wg.Wait()
 		return c.val, c.err
