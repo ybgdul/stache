@@ -133,18 +133,21 @@ func (c *Client) Set(key string, val []byte, ttl time.Duration) error {
 	return nil
 }
 
-func (c *Client) Delete(key string) error { 
+func (c *Client) Delete(key string) bool { 
 	fullKey := c.formatKey(key)
 	conn, err := c.getConn()
 	if err != nil { 
-		return err
+		return false
 	}
 
 	req := &protocol.Request{Cmd: protocol.CmdDelete, Key: fullKey}
 	if err := protocol.WriteRequest(conn, req); err != nil { 
 		c.resetConn()
-		return err 
+		return false 
 	}
-	protocol.ReadResponse(conn)
-	return nil 
+	resp, err := protocol.ReadResponse(conn)
+	if err != nil { 
+		return false
+	}
+	return resp.Status == protocol.StatusOk
 }

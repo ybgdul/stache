@@ -37,3 +37,29 @@ func (g *Group) DoGroup(key string, fn func() (any, error)) (any, error) {
 
 	return c.val, c.err
 }
+
+
+func (g *Group) DoGroupDelete(key string, fn func() (error)) (error) {
+	g.mu.Lock()
+	if g.callMap == nil { 
+		g.callMap = make(map[string]*call)
+	}
+	if c, ok := g.callMap[key]; ok { 
+		g.mu.Unlock()
+		c.wg.Wait()
+		return c.err
+	}
+
+	c := new(call)
+	c.wg.Add(1)
+	g.callMap[key] = c
+	g.mu.Unlock()
+
+	c.err = fn()
+	c.wg.Done()
+
+	g.mu.Lock()
+	delete(g.callMap, key)
+
+	return c.err
+}
