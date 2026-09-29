@@ -90,7 +90,6 @@ func (s *UserService) UpdateUser(ctx context.Context, user User) error {
 
 	// true if evicted or absent, false if the daemon was unreachable
 	s.client.Delete(stache.Key("user", user.ID))
-
 	return nil
 }
 ```
